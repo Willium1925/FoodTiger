@@ -1,16 +1,17 @@
 CREATE DATABASE IF NOT EXISTS FoodTigerDB;
 
-DROP TABLE IF EXISTS user;
-DROP TABLE IF EXISTS address;
-DROP TABLE IF EXISTS restaurant;
-DROP TABLE IF EXISTS menu_item;
-DROP TABLE IF EXISTS orderr;
-DROP TABLE IF EXISTS orderr_item;
 DROP TABLE IF EXISTS payment;
+DROP TABLE IF EXISTS orderr_item;
+DROP TABLE IF EXISTS orderr;
+DROP TABLE IF EXISTS menu_item;
+DROP TABLE IF EXISTS restaurant;
+DROP TABLE IF EXISTS address;
+DROP TABLE IF EXISTS user;
+
 
 
 CREATE TABLE user(
-                       id BIGINT AUTO_INCREMENT PRIMARY KEY,  -- 主鍵，使用 AUTO_INCREMENT 確保唯一且自動增長，便於分頁查詢
+                       id BIGINT AUTO_INCREMENT PRIMARY KEY,
                        username VARCHAR(50) NOT NULL UNIQUE,  -- 用戶名，唯一
                        password VARCHAR(255) NOT NULL,        --  hashed 密碼
                        email VARCHAR(100) UNIQUE,             -- 電子郵件，可 NULL 但唯一
@@ -46,7 +47,7 @@ CREATE TABLE restaurant (
                              owner_id BIGINT NOT NULL,              -- 擁有者，連結 user
                              address_id BIGINT NOT NULL,            -- 地址，連結 address
                              description TEXT,
-                             rating DECIMAL(3,2) DEFAULT 0.00,      -- 評分，精確到小數兩位
+                             rating DECIMAL(3,1) DEFAULT 0,      -- 評分，精確到小數1位
                              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                              FOREIGN KEY (owner_id) REFERENCES user(id) ON DELETE RESTRICT,  -- 限制刪除擁有者，避免餐廳孤立
@@ -54,7 +55,8 @@ CREATE TABLE restaurant (
 );
 -- 索引：加速搜尋
 CREATE INDEX idx_restaurant_name ON restaurant(name);
-CREATE INDEX idx_restaurant_owner_id ON restaurant(rating);
+CREATE INDEX idx_restaurant_rating ON restaurant(rating);
+CREATE INDEX idx_restaurant_owner_id ON restaurant(owner_id); -- 加速查詢某擁有者的餐廳，方便餐廳管理員
 
 
 CREATE TABLE menu_item (
@@ -62,12 +64,12 @@ CREATE TABLE menu_item (
                             restaurant_id BIGINT NOT NULL,         -- 所屬餐廳
                             title VARCHAR(100) NOT NULL,
                             description TEXT,
-                            price DECIMAL(10,2) NOT NULL,
+                            price INT NOT NULL,
                             image_url VARCHAR(255),                -- 圖片連結，易整合 CDN
                             available BOOLEAN DEFAULT TRUE,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                            FOREIGN KEY (restaurant_id) REFERENCES restaurant(id) ON DELETE CASCADE
+                            FOREIGN KEY (restaurant_id) REFERENCES restaurant(id) ON DELETE CASCADE     -- 刪除餐廳時連動刪除菜單項目，維持一致性
 );
 
 
@@ -83,6 +85,8 @@ CREATE TABLE orderr (
                         status ENUM('處理中', '準備中', '運送中', '完成', '取消') DEFAULT '處理中',
                         orderr_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         estimated_delivery_time TIMESTAMP,
+                        completed_time TIMESTAMP,
+                        rating INT CHECK (rating BETWEEN 1 AND 5), -- 顧客評分，限制只能 1-5 星
                         FOREIGN KEY (user_id) REFERENCES user(id),
                         FOREIGN KEY (restaurant_id) REFERENCES restaurant(id),
                         FOREIGN KEY (delivery_person_id) REFERENCES user(id),
@@ -94,21 +98,21 @@ CREATE INDEX idx_orderr_status ON orderr(status);
 CREATE INDEX idx_orderr_user_id ON orderr(user_id);
 
 
-CREATE TABLE order_item (
+CREATE TABLE orderr_item (
                              id BIGINT AUTO_INCREMENT PRIMARY KEY,
                              orderr_id BIGINT NOT NULL,
                              menu_item_id BIGINT NOT NULL,
                              quantity INT NOT NULL DEFAULT 1,
                              price_at_orderr INT NOT NULL,  -- 訂單時價格，凍結值
-                             FOREIGN KEY (orderr_id) REFERENCES orderr(id) ON DELETE CASCADE,
-                             FOREIGN KEY (menu_item_id) REFERENCES menu_item(id) ON DELETE RESTRICT
+                             FOREIGN KEY (orderr_id) REFERENCES orderr(id) ON DELETE CASCADE,        -- 刪除訂單時連動刪除訂單項目
+                             FOREIGN KEY (menu_item_id) REFERENCES menu_item(id) ON DELETE RESTRICT  -- 限制刪除菜單項目，當有訂單項目引用某個菜單項目時，該菜單項目不能被刪除，避免訂單孤立
 );
 
 
 CREATE TABLE payment (
                          id BIGINT AUTO_INCREMENT PRIMARY KEY,
                          orderr_id BIGINT NOT NULL UNIQUE,       -- 一訂單一支付
-                         amount DECIMAL(10,2) NOT NULL,
+                         amount INT NOT NULL,
                          payment_method ENUM('刷卡', '現金', 'App') NOT NULL,
                          transaction_id VARCHAR(100),           -- 第三方 ID
                          status ENUM('處理中', '付款成功', '付款失敗') DEFAULT '處理中',
