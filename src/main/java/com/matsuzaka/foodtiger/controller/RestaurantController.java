@@ -25,7 +25,8 @@ public class RestaurantController {
     @GetMapping("/{id}")
     public ResponseEntity<Restaurant> getRestaurantById(@PathVariable Long id) {
         return restaurantService.findRestaurantById(id)
-                .map(restaurant -> new ResponseEntity<>(restaurant, HttpStatus.OK))n                .orElse(new ResponseEntity<>(HttpStatus.NOT_FOUND));
+                .map(restaurant -> new ResponseEntity<>(restaurant, HttpStatus.OK))
+                .orElse(new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
     @PostMapping

@@ -91,7 +91,7 @@ public class JwtTokenProvider {
      * @return 用戶名
      */
     public String getUsernameFromJwt(String token) {
-        return Jwts.parserBuilder().setSigningKey(key).build()
+        return Jwts.parser().setSigningKey(key).build()
                 .parseClaimsJws(token)
                 .getBody().getSubject();
     }
@@ -104,7 +104,7 @@ public class JwtTokenProvider {
      */
     public boolean validateToken(String authToken) {
         try {
-            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(authToken);
+            Jwts.parser().setSigningKey(key).build().parseClaimsJws(authToken);
             return true;
         } catch (MalformedJwtException ex) {
             logger.error("無效的 JWT 令牌: {}", ex.getMessage()); // ERROR 級別日誌
